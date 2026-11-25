@@ -116,32 +116,24 @@ def verify_webhook():
 # =====================================
 # RECEIVE WHATSAPP MESSAGES
 # =====================================
-
 @app.route("/webhook", methods=["POST"])
 def receive_message():
 
     data = request.get_json(silent=True) or {}
 
     try:
-
         entries = data.get("entry", [])
 
         for entry in entries:
-
             changes = entry.get("changes", [])
 
             for change in changes:
-
                 value = change.get("value", {})
-
                 messages = value.get("messages", [])
 
                 for message in messages:
 
-                    message_type = message.get("type")
-
-                    if message_type != "text":
-
+                    if message.get("type") != "text":
                         continue
 
                     phone = message.get("from")
@@ -151,34 +143,58 @@ def receive_message():
                     ).get("body", "").strip()
 
                     if not phone or not text:
-
                         continue
 
                     print(
-                        f"NEW FARMER MESSAGE: "
-                        f"{phone}: {text}"
+                        f"NEW FARMER MESSAGE: {phone}: {text}",
+                        flush=True
                     )
 
-                    # AI PROCESSING
-
-                    answer = ask_shambabot(
-                        phone,
-                        text
+                    # STEP 1: AI PROCESSING
+                    print(
+                        "STEP 1: Sending message to ShambaBot AI...",
+                        flush=True
                     )
 
-                    # SEND RESPONSE
+                    answer = ask_shambabot(phone, text)
 
-                    send_whatsapp_message(
+                    print(
+                        f"AI RESPONSE: {answer}",
+                        flush=True
+                    )
+
+                    if not answer:
+                        answer = (
+                            "Samahani, nimepata ujumbe wako. "
+                            "Tafadhali jaribu tena baada ya muda mfupi."
+                        )
+
+                    # STEP 2: SEND WHATSAPP REPLY
+                    print(
+                        "STEP 2: Sending WhatsApp reply...",
+                        flush=True
+                    )
+
+                    result = send_whatsapp_message(
                         phone,
-                        answer
+                        str(answer)
+                    )
+
+                    print(
+                        f"WHATSAPP SEND SUCCESS: {result}",
+                        flush=True
                     )
 
     except Exception as error:
 
+        import traceback
+
         print(
-            "WEBHOOK ERROR:",
-            error
+            f"SHAMBABOT ERROR: {error}",
+            flush=True
         )
+
+        traceback.print_exc()
 
     return "EVENT_RECEIVED", 200
 
