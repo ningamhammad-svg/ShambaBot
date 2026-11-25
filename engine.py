@@ -5,7 +5,7 @@ from pathlib import Path
 from google import genai
 from dotenv import load_dotenv
 
-from brain.agriculture import AGRICULTURE_SYSTEM
+from agriculture import AGRICULTURE_SYSTEM
 
 
 ROOT = Path(__file__).resolve().parents[1]
