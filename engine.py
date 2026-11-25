@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 
 from pathlib import Path
 from google import genai
@@ -8,18 +9,36 @@ from dotenv import load_dotenv
 from agriculture import AGRICULTURE_SYSTEM
 
 
-ROOT = Path(__file__).resolve().parents[1]
+# =====================================
+# CONFIGURATION
+# =====================================
+
+ROOT = Path(__file__).resolve().parent
 
 load_dotenv(ROOT / ".env")
 
-client = genai.Client(
-    api_key=os.getenv("GEMINI_API_KEY")
-)
+logging.basicConfig(level=logging.INFO)
+
+logger = logging.getLogger("ShambaBot")
+
+API_KEY = os.getenv("GEMINI_API_KEY")
 
 MODEL = os.getenv(
     "GEMINI_MODEL",
     "gemini-3.1-flash-lite"
 )
+
+if not API_KEY:
+    logger.error("GEMINI_API_KEY haijapatikana!")
+
+client = genai.Client(
+    api_key=API_KEY
+) if API_KEY else None
+
+
+# =====================================
+# MEMORY DATABASE
+# =====================================
 
 DATABASE = ROOT / "database"
 
@@ -48,7 +67,12 @@ def load_memory():
             )
         )
 
-    except Exception:
+    except Exception as error:
+
+        logger.error(
+            "Memory loading error: %s",
+            error
+        )
 
         return {}
 
@@ -65,27 +89,61 @@ def save_memory(memory):
     )
 
 
+# =====================================
+# SHAMBABOT AI ENGINE
+# =====================================
+
 def ask_shambabot(phone, message):
 
-    memory = load_memory()
+    logger.info(
+        "Processing farmer message: %s",
+        phone
+    )
 
-    if phone not in memory:
+    if not client:
 
-        memory[phone] = []
-
-    history = memory[phone]
-
-    conversation = ""
-
-    for item in history[-12:]:
-
-        conversation += (
-            f"{item['role']}: "
-            f"{item['content']}\n"
+        logger.error(
+            "Gemini client haijaanzishwa. "
+            "Kagua GEMINI_API_KEY."
         )
 
-    prompt = f"""
+        return (
+            "Samahani mkulima, huduma yetu ya AI "
+            "haipatikani kwa sasa. Tafadhali jaribu tena."
+        )
+
+    try:
+
+        memory = load_memory()
+
+        if phone not in memory:
+
+            memory[phone] = []
+
+        history = memory[phone]
+
+        conversation = ""
+
+        for item in history[-12:]:
+
+            conversation += (
+                f"{item['role']}: "
+                f"{item['content']}\n"
+            )
+
+        prompt = f"""
 {AGRICULTURE_SYSTEM}
+
+MAELEKEZO YA ZIADA:
+
+- Wewe ni ShambaBot, mtaalamu wa masuala ya kilimo.
+- Jibu kwa lugha ambayo mkulima ametumia.
+- Tumia Kiswahili fasaha pale mkulima anapotumia Kiswahili.
+- Toa majibu yenye manufaa na yanayotekelezeka.
+- Uliza maswali ya ziada pale taarifa hazijakamilika.
+- Usibuni taarifa za kisayansi au dawa za mimea.
+- Toa tahadhari kuhusu matumizi salama ya viuatilifu.
+- Usijibu nje ya mada bila sababu.
 
 MAZUNGUMZO YALIYOPITA:
 
@@ -95,28 +153,33 @@ UJUMBE MPYA WA MKULIMA:
 
 {message}
 
-Jibu ujumbe huu kwa kuzingatia mazungumzo
-yaliyopita na mahitaji ya mkulima.
+Jibu ujumbe huu kwa kuzingatia historia ya mazungumzo.
 """
 
-    try:
+        logger.info(
+            "Sending request to Gemini model: %s",
+            MODEL
+        )
 
         response = client.models.generate_content(
-
             model=MODEL,
-
             contents=prompt
-
         )
 
         answer = (response.text or "").strip()
 
         if not answer:
 
+            logger.warning(
+                "Gemini returned empty response."
+            )
+
             return (
-                "Samahani, sijapata jibu kwa sasa. "
+                "Samahani mkulima, sijapata jibu kwa sasa. "
                 "Tafadhali jaribu tena."
             )
+
+        # SAVE FARMER MESSAGE
 
         history.append({
 
@@ -126,6 +189,8 @@ yaliyopita na mahitaji ya mkulima.
 
         })
 
+        # SAVE AI RESPONSE
+
         history.append({
 
             "role": "ShambaBot",
@@ -134,23 +199,34 @@ yaliyopita na mahitaji ya mkulima.
 
         })
 
-        # Tunahifadhi mazungumzo ya hivi karibuni.
+        # KEEP RECENT CONVERSATION
+
         memory[phone] = history[-24:]
 
         save_memory(memory)
 
+        logger.info(
+            "Gemini response generated successfully."
+        )
+
         return answer
 
-    except Exception as error:
+    except Exception:
 
-        print("SHAMBABOT ERROR:", error)
+        logger.exception(
+            "SHAMBABOT GEMINI ERROR"
+        )
 
         return (
             "Samahani mkulima, nimepata changamoto "
-            "ya kiufundi. Tafadhali jaribu tena "
-            "baada ya muda mfupi."
+            "ya kiufundi wakati wa kutengeneza jibu. "
+            "Tafadhali jaribu tena baada ya muda mfupi."
         )
 
+
+# =====================================
+# CLEAR FARMER MEMORY
+# =====================================
 
 def clear_farmer_memory(phone):
 
@@ -161,6 +237,11 @@ def clear_farmer_memory(phone):
         del memory[phone]
 
         save_memory(memory)
+
+        logger.info(
+            "Memory cleared for farmer: %s",
+            phone
+        )
 
         return True
 
