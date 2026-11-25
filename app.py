@@ -4,7 +4,7 @@ import requests
 from flask import Flask, request
 from dotenv import load_dotenv
 
-from brain.engine import ask_shambabot
+from engine import ask_shambabot
 
 
 # =====================================
