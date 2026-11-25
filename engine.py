@@ -18,7 +18,7 @@ client = genai.Client(
 
 MODEL = os.getenv(
     "GEMINI_MODEL",
-    "gemini-1.5-flash"
+    "gemini-3.8-flash"
 )
 
 DATABASE = ROOT / "database"
