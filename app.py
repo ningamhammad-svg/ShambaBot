@@ -122,16 +122,60 @@ def receive_message():
     data = request.get_json(silent=True) or {}
 
     try:
-        entries = data.get("entry", [])
+        for entry in data.get("entry", []):
 
-        for entry in entries:
-            changes = entry.get("changes", [])
+            for change in entry.get("changes", []):
 
-            for change in changes:
                 value = change.get("value", {})
-                messages = value.get("messages", [])
 
-                for message in messages:
+                # =================================
+                # CHECK MESSAGE DELIVERY STATUS
+                # =================================
+
+                for status in value.get("statuses", []):
+
+                    print(
+                        "WHATSAPP DELIVERY STATUS:",
+                        status,
+                        flush=True
+                    )
+
+                    state = status.get("status")
+                    message_id = status.get("id")
+                    recipient = status.get("recipient_id")
+
+                    if state == "failed":
+
+                        print(
+                            "MESSAGE DELIVERY FAILED!",
+                            flush=True
+                        )
+
+                        print(
+                            "ERROR DETAILS:",
+                            status.get("errors"),
+                            flush=True
+                        )
+
+                    elif state == "delivered":
+
+                        print(
+                            f"MESSAGE DELIVERED TO {recipient}",
+                            flush=True
+                        )
+
+                    elif state == "read":
+
+                        print(
+                            f"MESSAGE READ BY {recipient}",
+                            flush=True
+                        )
+
+                # =================================
+                # RECEIVE FARMER MESSAGE
+                # =================================
+
+                for message in value.get("messages", []):
 
                     if message.get("type") != "text":
                         continue
@@ -150,9 +194,8 @@ def receive_message():
                         flush=True
                     )
 
-                    # STEP 1: AI PROCESSING
                     print(
-                        "STEP 1: Sending message to ShambaBot AI...",
+                        "STEP 1: GEMINI PROCESSING",
                         flush=True
                     )
 
@@ -163,42 +206,29 @@ def receive_message():
                         flush=True
                     )
 
-                    if not answer:
-                        answer = (
-                            "Samahani, nimepata ujumbe wako. "
-                            "Tafadhali jaribu tena baada ya muda mfupi."
-                        )
-
-                    # STEP 2: SEND WHATSAPP REPLY
                     print(
-                        "STEP 2: Sending WhatsApp reply...",
+                        "STEP 2: WHATSAPP SENDING",
                         flush=True
                     )
 
                     result = send_whatsapp_message(
                         phone,
-                        str(answer)
+                        answer
                     )
 
                     print(
-                        f"WHATSAPP SEND SUCCESS: {result}",
+                        "WHATSAPP API RESPONSE:",
+                        result,
                         flush=True
                     )
 
-    except Exception as error:
+    except Exception:
 
         import traceback
-
-        print(
-            f"SHAMBABOT ERROR: {error}",
-            flush=True
-        )
 
         traceback.print_exc()
 
     return "EVENT_RECEIVED", 200
-
-
 # =====================================
 # HEALTH CHECK
 # =====================================
