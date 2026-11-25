@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 
 from engine import ask_shambabot
 
-
 # =====================================
 # CONFIGURATION
 # =====================================
